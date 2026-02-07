@@ -423,6 +423,10 @@ protected function casts(): array
 composer test
 ```
 
+## Credits
+
+This package is inspired by and built upon the work of [asantibanez/laravel-eloquent-state-machines](https://github.com/asantibanez/laravel-eloquent-state-machines) by Andrés Santibáñez. The original package provided the foundation for Eloquent state machine management that this package extends with native BackedEnum support, N+1 prevention, transaction safety, lifecycle events, and other improvements.
+
 ## Changelog
 
 Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
