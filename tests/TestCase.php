@@ -1,10 +1,11 @@
 <?php
 
-namespace VendorName\Skeleton\Tests;
+namespace Iotron\StateMachine\Tests;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Iotron\StateMachine\StateMachineServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
-use VendorName\Skeleton\SkeletonServiceProvider;
 
 class TestCase extends Orchestra
 {
@@ -12,26 +13,39 @@ class TestCase extends Orchestra
     {
         parent::setUp();
 
-        Factory::guessFactoryNamesUsing(
-            fn (string $modelName) => 'VendorName\\Skeleton\\Database\\Factories\\'.class_basename($modelName).'Factory'
-        );
+        $this->setUpDatabase();
     }
 
-    protected function getPackageProviders($app)
+    protected function getPackageProviders($app): array
     {
         return [
-            SkeletonServiceProvider::class,
+            StateMachineServiceProvider::class,
         ];
     }
 
-    public function getEnvironmentSetUp($app)
+    protected function getEnvironmentSetUp($app): void
     {
         config()->set('database.default', 'testing');
+        config()->set('database.connections.testing', [
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+            'prefix' => '',
+        ]);
+    }
 
-        /*
-         foreach (\Illuminate\Support\Facades\File::allFiles(__DIR__ . '/../database/migrations') as $migration) {
-            (include $migration->getRealPath())->up();
-         }
-         */
+    protected function setUpDatabase(): void
+    {
+        // Run package migrations
+        foreach (glob(__DIR__.'/../database/migrations/*.php') as $migration) {
+            (include $migration)->up();
+        }
+
+        // Create test model table
+        Schema::create('test_models', function (Blueprint $table) {
+            $table->id();
+            $table->string('status')->nullable();
+            $table->string('name')->nullable();
+            $table->timestamps();
+        });
     }
 }

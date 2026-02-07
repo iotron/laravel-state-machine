@@ -1,0 +1,19 @@
+<?php
+
+namespace Iotron\StateMachine\Tests\Fixtures;
+
+use Illuminate\Database\Eloquent\Model;
+use Iotron\StateMachine\Concerns\HasStateMachines;
+
+class HookModel extends Model
+{
+    use HasStateMachines;
+
+    protected $table = 'test_models';
+
+    protected $guarded = [];
+
+    public $stateMachines = [
+        'status' => HookStateMachine::class,
+    ];
+}

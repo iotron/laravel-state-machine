@@ -1,0 +1,262 @@
+# iotron/laravel-state-machine
+
+> A robust, enum-aware state machine for Laravel Eloquent models.
+
+## Overview
+
+This package provides a state machine implementation for Laravel Eloquent models with native BackedEnum support, N+1 query prevention, transaction-safe transitions, and lifecycle events. It is a drop-in replacement for `asantibanez/laravel-eloquent-state-machines` with no external dependencies beyond Laravel.
+
+**Requirements**: PHP 8.2+ | Laravel 11+
+
+## Installation
+
+```bash
+composer require iotron/laravel-state-machine
+```
+
+Publish config and migrations:
+```bash
+php artisan vendor:publish --tag=state-machine-config
+php artisan vendor:publish --tag=state-machine-migrations
+php artisan migrate
+```
+
+## Quick Start
+
+### 1. Create a State Machine
+
+```bash
+php artisan make:state-machine OrderStatusStateMachine
+```
+
+```php
+namespace App\StateMachines;
+
+use App\Enums\OrderStatus;
+use Iotron\StateMachine\StateMachines\StateMachine;
+
+class OrderStatusStateMachine extends StateMachine
+{
+    public function transitions(): array
+    {
+        return [
+            'pending'   => ['confirmed', 'cancelled'],
+            'confirmed' => ['dispatched', 'cancelled'],
+            'dispatched' => ['delivered'],
+        ];
+    }
+
+    public function defaultState(): ?string
+    {
+        return OrderStatus::PENDING->value;
+    }
+}
+```
+
+### 2. Add Trait to Model
+
+```php
+use Iotron\StateMachine\Concerns\HasStateMachines;
+
+class Order extends Model
+{
+    use HasStateMachines;
+
+    public $stateMachines = [
+        'status' => OrderStatusStateMachine::class,
+    ];
+
+    protected function casts(): array
+    {
+        return ['status' => OrderStatus::class];
+    }
+}
+```
+
+### 3. Use It
+
+```php
+$order = Order::create();
+
+// Check current state
+$order->status()->is(OrderStatus::PENDING);      // true
+$order->status()->canBe(OrderStatus::CONFIRMED);  // true
+
+// Transition
+$order->status()->transitionTo(OrderStatus::CONFIRMED);
+
+// History
+$order->status()->was(OrderStatus::PENDING);       // true
+$order->status()->timesWas(OrderStatus::PENDING);   // 1
+$order->status()->whenWas(OrderStatus::CONFIRMED);  // Carbon instance
+$order->status()->snapshotWhen(OrderStatus::CONFIRMED); // Transition model
+
+// Custom properties
+$order->status()->transitionTo('dispatched', ['tracking' => 'ABC123']);
+$order->status()->getCustomProperty('tracking'); // 'ABC123'
+```
+
+## Core API
+
+### StateMachine (abstract base class)
+
+Extend this to define your state machine. All methods accept both strings and BackedEnum values.
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `transitions(): array` | array | **Required.** Map of `from => [to, ...]` allowed transitions |
+| `defaultState(): string\|BackedEnum\|null` | mixed | **Required.** Initial state for new models |
+| `recordHistory(): bool` | bool | Whether to track transitions (default: `true`) |
+| `validatorForTransition($from, $to, $model): ?Validator` | ?Validator | Return a Validator to block invalid transitions |
+| `beforeTransitionHooks(): array` | array | Closures keyed by `$from` state, called `fn($from, $to, $model)` |
+| `afterTransitionHooks(): array` | array | Closures keyed by `$to` state, called `fn($from, $to, $model)` |
+
+### State (proxy returned by `$model->field()`)
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `state()` | string | Current state value (normalized to string) |
+| `is($state)` | bool | Check if current state matches |
+| `isNot($state)` | bool | Check if current state doesn't match |
+| `canBe($state)` | bool | Check if transition to `$state` is allowed |
+| `transitionTo($state, $props, $responsible)` | void | Execute transition |
+| `postponeTransitionTo($state, Carbon $when, ...)` | ?PendingTransition | Schedule future transition |
+| `was($state)` | bool | Check if model was ever in this state |
+| `timesWas($state)` | int | Count times model was in this state |
+| `whenWas($state)` | ?Carbon | When model last entered this state |
+| `snapshotWhen($state)` | ?Transition | Get the Transition record for a state |
+| `snapshotsWhen($state)` | Collection | Get all Transition records for a state |
+| `history()` | Builder | Query builder for this field's history |
+| `latest()` | ?Transition | Most recent transition to current state |
+| `getCustomProperty($key)` | mixed | Get custom property from latest transition |
+| `responsible()` | ?Model | Get responsible user from latest transition |
+| `allCustomProperties()` | array | Get all custom properties from latest |
+| `pendingTransitions()` | Builder | Query pending transitions for this field |
+| `hasPendingTransitions()` | bool | Check if pending transitions exist |
+
+### HasStateMachines (trait)
+
+Add to your model. Provides:
+
+| Method | Description |
+|--------|-------------|
+| `$model->field()` | Returns `State` proxy (via `__call()` magic) |
+| `stateHistory()` | MorphMany relationship to Transition model |
+| `transitions()` | Alias for `stateHistory()` |
+| `pendingTransitions()` | MorphMany relationship to PendingTransition model |
+| `recordState(...)` | Record a transition in history |
+| `recordPendingTransition(...)` | Record a pending transition |
+| `getChangedAttributes()` | Get dirty attributes in old/new format |
+
+## Features
+
+### BackedEnum Support
+
+All methods accept BackedEnum values. They are normalized to strings internally:
+
+```php
+// Both work identically:
+$model->status()->canBe('confirmed');
+$model->status()->canBe(OrderStatus::CONFIRMED);
+```
+
+### N+1 Prevention
+
+Eager-load `stateHistory` to avoid extra queries:
+
+```php
+$orders = Order::with('stateHistory')->get();
+
+foreach ($orders as $order) {
+    $order->status()->was(OrderStatus::PENDING);    // 0 queries
+    $order->status()->timesWas(OrderStatus::PENDING); // 0 queries
+    $order->status()->snapshotWhen(OrderStatus::CONFIRMED); // 0 queries
+}
+```
+
+### Transaction Safety
+
+Transitions are wrapped in `DB::transaction()`:
+1. Validation runs outside the transaction (read-only)
+2. Before hooks fire before save
+3. Model save + history recording + pending cancellation happen atomically
+4. After hooks fire outside the transaction (safe for jobs/notifications)
+
+### Validation
+
+Return a `Validator` from `validatorForTransition()` to block transitions:
+
+```php
+public function validatorForTransition($from, $to, $model): ?Validator
+{
+    if ($to === 'published') {
+        $validator = ValidatorFacade::make([], []);
+        if (!$model->sales_employee_id) {
+            $validator->after(fn ($v) => $v->errors()->add('employee', 'Required'));
+        }
+        return $validator;
+    }
+    return null;
+}
+```
+
+### Events
+
+Three events dispatched during transitions:
+
+| Event | When |
+|-------|------|
+| `TransitionStarted` | Before hooks, before save |
+| `TransitionCompleted` | After everything succeeds |
+| `TransitionFailed` | On exception (after TransitionStarted) |
+
+Each carries: `$model`, `$field`, `$from`, `$to` (and `$exception` for Failed).
+
+### Pending Transitions
+
+Schedule future transitions:
+
+```php
+$model->status()->postponeTransitionTo('active', Carbon::tomorrow());
+```
+
+Use `DispatchPendingTransitions` job (schedule it) to execute them:
+
+```php
+// In your scheduler:
+Schedule::job(new \Iotron\StateMachine\Jobs\DispatchPendingTransitions)->everyMinute();
+```
+
+## Configuration
+
+```php
+// config/state-machine.php
+return [
+    'tables' => [
+        'transitions' => 'state_histories',       // table name for history
+        'pending_transitions' => 'pending_transitions',
+    ],
+    'record_changed_attributes' => true,
+    'cancel_pending_on_transition' => true,
+];
+```
+
+## Models
+
+### Transition
+
+History records with scopes: `forField()`, `from()`, `to()`, `withTransition()`, `withCustomProperty()`, `withResponsible()`.
+
+### PendingTransition
+
+Scheduled transitions with scopes: `notApplied()`, `onScheduleOrOverdue()`, `forField()`.
+
+## Migration from asantibanez/laravel-eloquent-state-machines
+
+1. Install: `composer require iotron/laravel-state-machine`
+2. Update model imports: `use Iotron\StateMachine\Concerns\HasStateMachines;`
+3. Update state machine imports: `use Iotron\StateMachine\StateMachines\StateMachine;`
+4. Set config table to `state_histories` (default) for backward compatibility
+5. Remove old package: `composer remove asantibanez/laravel-eloquent-state-machines javoscript/laravel-macroable-models`
+
+No migration needed — uses the same `state_histories` table by default.

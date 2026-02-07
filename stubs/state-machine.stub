@@ -1,0 +1,21 @@
+<?php
+
+namespace {{ namespace }};
+
+use Iotron\StateMachine\StateMachines\StateMachine;
+
+class {{ class }} extends StateMachine
+{
+    public function transitions(): array
+    {
+        return [
+            // 'pending' => ['active', 'cancelled'],
+            // 'active' => ['completed', 'cancelled'],
+        ];
+    }
+
+    public function defaultState(): ?string
+    {
+        return null;
+    }
+}
