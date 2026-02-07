@@ -6,14 +6,28 @@
         "laravel",
         "state-machine",
         "eloquent",
-        "enum"
+        "enum",
+        "workflow",
+        "transitions",
+        "finite-state-machine",
+        "audit-trail"
     ],
-    "homepage": "https://github.com/iotron/laravel-state-machine",
+    "homepage": "https://iotron.co",
+    "support": {
+        "issues": "https://github.com/iotron/laravel-state-machine/issues",
+        "source": "https://github.com/iotron/laravel-state-machine"
+    },
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/iotron"
+        }
+    ],
     "license": "MIT",
     "authors": [
         {
             "name": "Iotron",
-            "email": "hello@iotron.com",
+            "email": "hello@iotron.co",
             "role": "Developer"
         }
     ],
