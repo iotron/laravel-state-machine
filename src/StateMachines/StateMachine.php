@@ -185,7 +185,7 @@ abstract class StateMachine
             $beforeTransitionHooks = $this->beforeTransitionHooks()[$from] ?? [];
             collect($beforeTransitionHooks)->each(fn ($callable) => $callable($from, $to, $this->model));
 
-            DB::transaction(function () use ($from, $to, $customProperties, $responsible) {
+            $commit = function () use ($from, $to, $customProperties, $responsible) {
                 $field = $this->field;
                 $this->model->$field = $to;
 
@@ -201,7 +201,19 @@ abstract class StateMachine
                 if (config('state-machine.cancel_pending_on_transition', true)) {
                     $this->cancelAllPendingTransitions();
                 }
-            });
+            };
+
+            // Defer to an already-open transaction rather than opening a nested one.
+            // A nested DB::transaction() would create a savepoint: correct, but it
+            // makes this method a second transaction opener, and a caller that wraps
+            // several transitions in one unit of work would accumulate savepoints it
+            // never asked for. When an outer transaction exists, that outer boundary
+            // is the atomic unit and this closure simply runs inside it.
+            if (DB::transactionLevel() > 0) {
+                $commit();
+            } else {
+                DB::transaction($commit);
+            }
 
             // After hooks run OUTSIDE transaction
             $afterTransitionHooks = $this->afterTransitionHooks()[$to] ?? [];

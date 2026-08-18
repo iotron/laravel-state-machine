@@ -1,5 +1,6 @@
 <?php
 
+use Carbon\Carbon;
 use Iotron\StateMachine\Tests\Fixtures\TestEnum;
 use Iotron\StateMachine\Tests\Fixtures\TestModel;
 use Iotron\StateMachine\Tests\Fixtures\TestModelWithEnum;
@@ -58,7 +59,7 @@ describe('History Tracking', function () {
 
         $when = $model->status()->whenWas('active');
 
-        expect($when)->toBeInstanceOf(\Carbon\Carbon::class);
+        expect($when)->toBeInstanceOf(Carbon::class);
     });
 
     it('snapshotWhen() returns transition record', function () {

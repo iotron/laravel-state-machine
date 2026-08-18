@@ -5,6 +5,7 @@ namespace Iotron\StateMachine\StateMachines;
 use BackedEnum;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Iotron\StateMachine\Models\PendingTransition;
 use Iotron\StateMachine\Models\Transition;
 
@@ -92,7 +93,7 @@ class State
         return $this->stateMachine->snapshotWhen($state);
     }
 
-    public function snapshotsWhen(string|BackedEnum $state): \Illuminate\Support\Collection
+    public function snapshotsWhen(string|BackedEnum $state): Collection
     {
         return $this->stateMachine->snapshotsWhen($state);
     }

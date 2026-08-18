@@ -1,5 +1,6 @@
 <?php
 
+use Carbon\Carbon;
 use Iotron\StateMachine\Tests\Fixtures\TestEnum;
 use Iotron\StateMachine\Tests\Fixtures\TestModelWithEnum;
 
@@ -44,7 +45,7 @@ describe('BackedEnum Support', function () {
         expect($model->status()->was(TestEnum::PENDING))->toBeTrue();
         expect($model->status()->was(TestEnum::COMPLETED))->toBeFalse();
         expect($model->status()->timesWas(TestEnum::PENDING))->toBe(1);
-        expect($model->status()->whenWas(TestEnum::ACTIVE))->toBeInstanceOf(\Carbon\Carbon::class);
+        expect($model->status()->whenWas(TestEnum::ACTIVE))->toBeInstanceOf(Carbon::class);
     });
 
     it('snapshotWhen works with enums', function () {
@@ -63,7 +64,7 @@ describe('BackedEnum Support', function () {
     it('postponeTransitionTo works with enums', function () {
         $model = TestModelWithEnum::create();
 
-        $pending = $model->status()->postponeTransitionTo(TestEnum::ACTIVE, \Carbon\Carbon::tomorrow());
+        $pending = $model->status()->postponeTransitionTo(TestEnum::ACTIVE, Carbon::tomorrow());
 
         expect($pending)->not->toBeNull();
         expect($pending->to)->toBe('active');

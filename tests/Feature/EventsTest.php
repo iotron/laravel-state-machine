@@ -5,6 +5,8 @@ use Iotron\StateMachine\Events\TransitionCompleted;
 use Iotron\StateMachine\Events\TransitionFailed;
 use Iotron\StateMachine\Events\TransitionStarted;
 use Iotron\StateMachine\Exceptions\TransitionNotAllowedException;
+use Iotron\StateMachine\Tests\Fixtures\HookModel;
+use Iotron\StateMachine\Tests\Fixtures\HookStateMachine;
 use Iotron\StateMachine\Tests\Fixtures\TestModel;
 
 describe('Transition Events', function () {
@@ -51,27 +53,27 @@ describe('Transition Events', function () {
 describe('Transition Hooks', function () {
 
     it('fires before and after hooks with correct arguments', function () {
-        \Iotron\StateMachine\Tests\Fixtures\HookStateMachine::$hookLog = [];
+        HookStateMachine::$hookLog = [];
 
-        $model = \Iotron\StateMachine\Tests\Fixtures\HookModel::create();
+        $model = HookModel::create();
 
         $model->status()->transitionTo('active');
 
-        $log = \Iotron\StateMachine\Tests\Fixtures\HookStateMachine::$hookLog;
+        $log = HookStateMachine::$hookLog;
 
         expect($log)->toContain('before:pending->active');
         expect($log)->toContain('after:pending->active');
     });
 
     it('fires before hooks before save', function () {
-        \Iotron\StateMachine\Tests\Fixtures\HookStateMachine::$hookLog = [];
+        HookStateMachine::$hookLog = [];
 
-        $model = \Iotron\StateMachine\Tests\Fixtures\HookModel::create();
+        $model = HookModel::create();
 
         $model->status()->transitionTo('active');
 
         // Before comes first
-        $log = \Iotron\StateMachine\Tests\Fixtures\HookStateMachine::$hookLog;
+        $log = HookStateMachine::$hookLog;
         $beforeIndex = array_search('before:pending->active', $log);
         $afterIndex = array_search('after:pending->active', $log);
 
